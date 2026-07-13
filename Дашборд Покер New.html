@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Дашборд рассылок</title>
+<style>
+  :root {
+    --bg: #F7F8FA; --card: #FFFFFF; --border: #E2E5EA;
+    --text: #1A1D23; --text-secondary: #6B7280; --text-muted: #9AA1AC;
+    --blue: #2A78D6; --aqua: #1BAF7A; --amber: #C98500;
+    --bg-warn: #FDF3E3; --text-warn: #8A5A00;
+    --bg-danger: #FCEBEB; --text-danger: #A32D2D;
+    --bg-ok: #EAF3DE; --text-ok: #3B6D11;
+    --radius: 8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181D; --card: #1E2127; --border: #2C3038;
+      --text: #F0F1F3; --text-secondary: #A1A7B3; --text-muted: #6B7280;
+      --bg-warn: #3A2E12; --text-warn: #F0B444;
+      --bg-danger: #3A1F1F; --text-danger: #E88888;
+      --bg-ok: #1E2F14; --text-ok: #9CCB6E;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--text); font-family: -apple-system, Arial, Helvetica, sans-serif; }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+  .subtitle { font-size: 13px; color: var(--text-secondary); margin: 0 0 20px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .filters { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+  .filter-group { display: flex; flex-direction: column; gap: 6px; }
+  .filter-label { font-size: 12px; color: var(--text-secondary); }
+  .pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill { border: 1px solid var(--border); background: var(--card); color: var(--text-secondary); font-size: 13px; padding: 6px 12px; border-radius: 20px; cursor: pointer; user-select: none; }
+  .pill.active { background: var(--text); color: var(--card); border-color: var(--text); }
+  input[type="date"] { border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: var(--radius); padding: 6px 8px; font-size: 13px; font-family: inherit; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .stat { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+  .stat-label { font-size: 12px; color: var(--text-secondary); margin: 0 0 4px; }
+  .stat-value { font-size: 22px; font-weight: 600; margin: 0; }
+  .rec-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .rec-item { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: var(--radius); font-size: 13px; line-height: 1.5; }
+  .rec-item.warn { background: var(--bg-warn); color: var(--text-warn); }
+  .rec-item.danger { background: var(--bg-danger); color: var(--text-danger); }
+  .rec-item.ok { background: var(--bg-ok); color: var(--text-ok); }
+  .rec-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-top: 6px; flex-shrink: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-secondary); font-weight: 500; font-size: 12px; }
+  .flag-bad { color: var(--text-danger); font-weight: 600; }
+  .flag-warn { color: var(--text-warn); font-weight: 600; }
+  .flag-ok { color: var(--text-ok); }
+  .legend { display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary); margin-top: 8px; }
+  .legend span { display: flex; align-items: center; gap: 4px; }
+  .dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  h3 { font-size: 14px; font-weight: 600; margin: 0 0 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Дашборд рассылок</h1>
+  <p class="subtitle">Академия Покера · ПокерХаус · РуКэшПокер</p>
+  <p id="dataStatus" style="font-size: 12px; color: var(--text-muted); margin: -14px 0 16px;"></p>
+
+  <div class="card filters">
+    <div class="filter-group">
+      <span class="filter-label">Проекты</span>
+      <div class="pills" id="projectPills"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">С даты</span>
+      <input type="date" id="dateFrom">
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">По дату</span>
+      <input type="date" id="dateTo">
+    </div>
+  </div>
+
+  <div class="stats" id="statsRow"></div>
+
+  <div class="card">
+    <h3>Рекомендации</h3>
+    <ul class="rec-list" id="recList"></ul>
+  </div>
+
+  <div class="card">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
+      <h3 id="chartTitle" style="margin: 0;">Open rate по кампаниям</h3>
+      <div class="pills" id="metricPills"></div>
+    </div>
+    <div style="position: relative; width: 100%; height: 240px;">
+      <canvas id="orChart"></canvas>
+    </div>
+    <div class="legend" id="chartLegend"></div>
+  </div>
+
+  <div class="card">
+    <h3>Сводка по проектам</h3>
+    <div style="overflow-x: auto;">
+      <table id="summaryTable">
+        <thead>
+          <tr><th>Проект</th><th>Кампаний</th><th>Отправлено</th><th>OR%</th><th>CTR%</th><th>CTOR%</th><th>Жалобы%</th><th>Bounce%</th></tr>
+        </thead>
+        <tbody id="summaryBody"></tbody>
+      </table>
+    </div>
+    <p style="font-size: 11px; color: var(--text-muted); margin: 10px 0 0;">Реалистичные бенчмарки (усреднённые данные по рынку, 2026): CTR ~2-2,5% средний уровень по рынку, &lt;1% ниже среднего · CTOR ~6-7% средний уровень, топ отраслей 12-15% · bounce &gt;2% — риск блокировки Gmail (порог с ноября 2025), &gt;5% точно нужна чистка базы · жалобы &gt;0,3% риск для репутации домена.</p>
+  </div>
+
+  <div class="card">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
+      <h3 id="monthChartTitle" style="margin: 0;">Open Rate по месяцам</h3>
+      <div class="pills" id="monthMetricPills"></div>
+    </div>
+    <div style="position: relative; width: 100%; height: 240px;">
+      <canvas id="monthChart"></canvas>
+    </div>
+    <div class="legend" id="monthLegend"></div>
+    <div style="overflow-x: auto; margin-top: 16px;">
+      <table id="monthTable">
+        <thead>
+          <tr><th>Месяц</th><th>Проект</th><th>Кампаний</th><th>Отправлено</th><th>OR%</th><th>CTR%</th><th>CTOR%</th><th>Bounce%</th><th>Жалобы%</th></tr>
+        </thead>
+        <tbody id="monthBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script>
+/* ===== ДАННЫЕ КАМПАНИЙ =====
+   Чтобы добавить новую кампанию — скопируйте строку и впишите свои значения.
+   date: 'ГГГГ-ММ-ДД', opens/clicks/unsubs/spam/bounce — абсолютные числа. */
+let campaigns = [
+  { date: '2026-05-12', project: 'Академия Покера', name: 'Дайджест апрель 2026 — 300 первичных', sent: 300, delivered: 299, opens: 98, clicks: 3, unsubs: 0, spam: 0, bounce: 1 },
+  { date: '2026-05-13', project: 'Академия Покера', name: 'Дайджест апрель 2026 — 1000 первичных', sent: 1000, delivered: 999, opens: 378, clicks: 12, unsubs: 0, spam: 0, bounce: 1 },
+  { date: '2026-05-14', project: 'Академия Покера', name: 'Дайджест апрель 2026 — Оставшиеся', sent: 2081, delivered: 2070, opens: 296, clicks: 13, unsubs: 12, spam: 0, bounce: 0 },
+  { date: '2026-05-14', project: 'ПокерХаус', name: 'PokerHouse Digest: апрель 2026', sent: 1058, delivered: 994, opens: 135, clicks: 5, unsubs: 63, spam: 1, bounce: 12 },
+  { date: '2026-05-14', project: 'Академия Покера', name: 'Дайджест «Академии Покера» за апрель 2026', sent: 2081, delivered: 2071, opens: 486, clicks: 20, unsubs: 15, spam: 0, bounce: 8 },
+  { date: '2026-05-22', project: 'Академия Покера', name: 'Неделя покера', sent: 3661, delivered: 3620, opens: 1081, clicks: 32, unsubs: 29, spam: 0, bounce: 16 },
+  { date: '2026-05-28', project: 'Академия Покера', name: 'Вы точно в курсе всех перемен в мире покера?', sent: 3632, delivered: 3595, opens: 1077, clicks: 51, unsubs: 12, spam: 0, bounce: 13 },
+  { date: '2026-06-10', project: 'Академия Покера', name: 'Два тренера, три совета и один инсайт', sent: 8190, delivered: 7910, opens: 1651, clicks: 43, unsubs: 72, spam: 5, bounce: 249 },
+  { date: '2026-06-11', project: 'ПокерХаус', name: 'Топ статей покера: от карманных пар до МСС', sent: 1058, delivered: 978, opens: 125, clicks: 6, unsubs: 3, spam: 1, bounce: 35 },
+  { date: '2026-06-17', project: 'Академия Покера', name: 'Покер в июне: билеты, советы и бонусы', sent: 12372, delivered: 12232, opens: 1871, clicks: 26, unsubs: 28, spam: 11, bounce: 27 },
+  { date: '2026-06-26', project: 'ПокерХаус', name: 'Стратегия, налоги и шафл — 4 разбора', sent: 1058, delivered: 973, opens: 122, clicks: 8, unsubs: 3, spam: 1, bounce: 9 },
+  { date: '2026-06-29', project: 'Академия Покера', name: 'МТТ-конференция: два тренера в прямом эфире 30 июня', sent: 15829, delivered: 15163, opens: 2179, clicks: 59, unsubs: 110, spam: 7, bounce: 664 },
+  { date: '2026-07-06', project: 'РуКэшПокер', name: 'Турниры, отбор на офлайн-чемпионат и акции румов', sent: 1532, delivered: 1201, opens: 35, clicks: 2, unsubs: 5, spam: 2, bounce: 331 },
+  { date: '2026-07-07', project: 'Академия Покера', name: 'Один вечер, два тренера, много пользы для MTT', sent: 15268, delivered: 15032, opens: 1692, clicks: 66, unsubs: 55, spam: 8, bounce: 221 }
+];
+/* ===== конец блока данных ===== */
+
+const PROJECT_COLORS = { 'Академия Покера': '#2A78D6', 'ПокерХаус': '#1BAF7A', 'РуКэшПокер': '#C98500' };
+const METRICS = {
+  or: { label: 'Open Rate', num: 'opens', den: 'delivered' },
+  ctr: { label: 'CTR', num: 'clicks', den: 'delivered' },
+  ctor: { label: 'CTOR', num: 'clicks', den: 'opens' },
+  bounce: { label: 'Bounce', num: 'bounce', den: 'sent' },
+  spam: { label: 'Жалобы', num: 'spam', den: 'delivered' }
+};
+let selectedMetric = 'or';
+let selectedMonthMetric = 'or';
+let allProjects = [];
+let activeProjects = new Set();
+let chart = null;
+let monthChart = null;
+
+/* ===== ПОДКЛЮЧЕНИЕ GOOGLE ТАБЛИЦЫ =====
+   1. В таблице: Файл → Опубликовать в интернете → выбрать лист «Кампании» → формат CSV → Опубликовать
+   2. Скопировать выданную ссылку и вставить сюда вместо ''
+   Если оставить пустым — дашборд работает на встроенных данных ниже. */
+const SHEET_CSV_URL = '';
+
+function initUI() {
+  allProjects = [...new Set(campaigns.map(c => c.project))];
+  activeProjects = new Set(allProjects);
+
+  const allDates = campaigns.map(c => c.date).sort();
+  document.getElementById('dateFrom').value = allDates[0];
+  document.getElementById('dateTo').value = allDates[allDates.length - 1];
+
+  const pillsWrap = document.getElementById('projectPills');
+  pillsWrap.innerHTML = '';
+  allProjects.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'pill active';
+    el.textContent = p;
+    el.onclick = () => { el.classList.toggle('active'); activeProjects.has(p) ? activeProjects.delete(p) : activeProjects.add(p); render(); };
+    pillsWrap.appendChild(el);
+  });
+
+  render();
+}
+
+document.getElementById('dateFrom').addEventListener('change', render);
+document.getElementById('dateTo').addEventListener('change', render);
+
+const metricPillsWrap = document.getElementById('metricPills');
+Object.entries(METRICS).forEach(([key, m]) => {
+  const el = document.createElement('div');
+  el.className = 'pill' + (key === selectedMetric ? ' active' : '');
+  el.textContent = m.label;
+  el.onclick = () => {
+    selectedMetric = key;
+    [...metricPillsWrap.children].forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('chartTitle').textContent = m.label + ' по кампаниям';
+    render();
+  };
+  metricPillsWrap.appendChild(el);
+});
+
+const monthMetricPillsWrap = document.getElementById('monthMetricPills');
+Object.entries(METRICS).forEach(([key, m]) => {
+  const el = document.createElement('div');
+  el.className = 'pill' + (key === selectedMonthMetric ? ' active' : '');
+  el.textContent = m.label;
+  el.onclick = () => {
+    selectedMonthMetric = key;
+    [...monthMetricPillsWrap.children].forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('monthChartTitle').textContent = m.label + ' по месяцам';
+    render();
+  };
+  monthMetricPillsWrap.appendChild(el);
+});
+
+function setStatus(text) {
+  const el = document.getElementById('dataStatus');
+  if (el) el.textContent = text;
+}
+
+async function loadFromGoogleSheets() {
+  if (!SHEET_CSV_URL) { setStatus('Источник: встроенные данные (ссылка на таблицу не указана)'); return; }
+  setStatus('Загружаю данные из Google Таблиц…');
+  try {
+    const res = await fetch(SHEET_CSV_URL);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    const parsed = Papa.parse(text, { skipEmptyLines: true }).data;
+    // первая строка — объединённый заголовок листа, вторая — названия колонок
+    const header = parsed[1].map(h => (h || '').toLowerCase());
+    const col = (needle) => header.findIndex(h => h.startsWith(needle));
+    const idx = {
+      date: col('дата'), project: col('проект'), name: col('название'),
+      sent: col('отправлено'), delivered: col('доставлено'),
+      opens: col('открытий'), clicks: col('кликов'),
+      unsubs: col('отписки'), spam: col('жалоб'), bounce: col('bounce')
+    };
+    const rows = parsed.slice(2)
+      .filter(r => r[idx.project] && r[idx.date] && /^\d{4}/.test(String(r[idx.date])))
+      .map(r => ({
+        date: new Date(r[idx.date]).toISOString().slice(0, 10),
+        project: r[idx.project].trim(),
+        name: r[idx.name] || '',
+        sent: +r[idx.sent] || 0, delivered: +r[idx.delivered] || 0,
+        opens: +r[idx.opens] || 0, clicks: +r[idx.clicks] || 0,
+        unsubs: +r[idx.unsubs] || 0, spam: +r[idx.spam] || 0, bounce: +r[idx.bounce] || 0
+      }));
+    if (rows.length === 0) throw new Error('Нет строк с кампаниями в ответе');
+    campaigns = rows;
+    initUI();
+    setStatus('Источник: Google Таблицы · обновлено ' + new Date().toLocaleTimeString('ru-RU'));
+  } catch (err) {
+    setStatus('Не удалось загрузить Google Таблицу (' + err.message + ') — показаны встроенные данные');
+  }
+}
+
+function fmt(n, d = 1) { return n.toLocaleString('ru-RU', { minimumFractionDigits: d, maximumFractionDigits: d }); }
+function fmtInt(n) { return Math.round(n).toLocaleString('ru-RU'); }
+
+function getFiltered() {
+  const from = document.getElementById('dateFrom').value;
+  const to = document.getElementById('dateTo').value;
+  return campaigns.filter(c => activeProjects.has(c.project) && c.date >= from && c.date <= to);
+}
+
+function aggregateByProject(rows) {
+  const out = {};
+  rows.forEach(c => {
+    if (!out[c.project]) out[c.project] = { campaigns: 0, sent: 0, delivered: 0, opens: 0, clicks: 0, unsubs: 0, spam: 0, bounce: 0 };
+    const a = out[c.project];
+    a.campaigns++; a.sent += c.sent; a.delivered += c.delivered; a.opens += c.opens;
+    a.clicks += c.clicks; a.unsubs += c.unsubs; a.spam += c.spam; a.bounce += c.bounce;
+  });
+  Object.values(out).forEach(a => {
+    a.or = a.delivered ? a.opens / a.delivered * 100 : 0;
+    a.ctr = a.delivered ? a.clicks / a.delivered * 100 : 0;
+    a.ctor = a.opens ? a.clicks / a.opens * 100 : 0;
+    a.spamPct = a.delivered ? a.spam / a.delivered * 100 : 0;
+    a.bouncePct = a.sent ? a.bounce / a.sent * 100 : 0;
+  });
+  return out;
+}
+
+function renderStats(rows, byProject) {
+  const totalSent = rows.reduce((s, c) => s + c.sent, 0);
+  const totalDelivered = rows.reduce((s, c) => s + c.delivered, 0);
+  const totalOpens = rows.reduce((s, c) => s + c.opens, 0);
+  const totalClicks = rows.reduce((s, c) => s + c.clicks, 0);
+  const or = totalDelivered ? totalOpens / totalDelivered * 100 : 0;
+  const ctr = totalDelivered ? totalClicks / totalDelivered * 100 : 0;
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat"><p class="stat-label">Кампаний</p><p class="stat-value">${rows.length}</p></div>
+    <div class="stat"><p class="stat-label">Отправлено</p><p class="stat-value">${fmtInt(totalSent)}</p></div>
+    <div class="stat"><p class="stat-label">Средний OR</p><p class="stat-value">${fmt(or)}%</p></div>
+    <div class="stat"><p class="stat-label">Средний CTR</p><p class="stat-value">${fmt(ctr, 2)}%</p></div>`;
+}
+
+function renderRecommendations(byProject) {
+  const list = document.getElementById('recList');
+  list.innerHTML = '';
+  const items = [];
+  Object.entries(byProject).forEach(([proj, a]) => {
+    if (a.bouncePct > 5) items.push({ level: 'danger', text: `${proj}: bounce ${fmt(a.bouncePct)}% — выше 5%, база требует чистки перед следующей отправкой.` });
+    else if (a.bouncePct > 2) items.push({ level: 'warn', text: `${proj}: bounce ${fmt(a.bouncePct)}% — выше 2%, а с ноября 2025 это порог, после которого Gmail может начать блокировать отправителя.` });
+    if (a.spamPct > 0.3) items.push({ level: 'danger', text: `${proj}: жалобы ${fmt(a.spamPct, 2)}% — выше порога риска для репутации домена.` });
+    if (a.ctr < 1) items.push({ level: 'warn', text: `${proj}: CTR ${fmt(a.ctr, 2)}% — ниже среднего по рынку (в среднем ~2-2,5%), стоит пересмотреть CTA и структуру письма.` });
+    if (a.ctor < 5 && a.opens > 0) items.push({ level: 'warn', text: `${proj}: CTOR ${fmt(a.ctor)}% — ниже среднего по рынку (в среднем ~6-7%), открывшие реже кликают, чем ожидается.` });
+  });
+  // тренд OR по времени для проектов с 4+ кампаниями в выборке
+  Object.keys(byProject).forEach(proj => {
+    const rows = getFiltered().filter(c => c.project === proj).sort((a, b) => a.date.localeCompare(b.date));
+    if (rows.length >= 4) {
+      const mid = Math.floor(rows.length / 2);
+      const firstOR = rows.slice(0, mid).reduce((s, c) => s + c.opens, 0) / rows.slice(0, mid).reduce((s, c) => s + c.delivered, 0) * 100;
+      const secondOR = rows.slice(mid).reduce((s, c) => s + c.opens, 0) / rows.slice(mid).reduce((s, c) => s + c.delivered, 0) * 100;
+      if (firstOR > 0 && (firstOR - secondOR) / firstOR > 0.25) {
+        items.push({ level: 'warn', text: `${proj}: OR снизился с ${fmt(firstOR)}% до ${fmt(secondOR)}% в выборке — проверьте, не расширялся ли сегмент за счёт менее тёплой части базы.` });
+      }
+    }
+  });
+  if (items.length === 0) items.push({ level: 'ok', text: 'Все метрики в выбранном диапазоне укладываются в бенчмарки — явных проблем не найдено.' });
+  items.forEach(it => {
+    const li = document.createElement('li');
+    li.className = 'rec-item ' + it.level;
+    li.innerHTML = `<span class="rec-dot"></span><span>${it.text}</span>`;
+    list.appendChild(li);
+  });
+}
+
+function renderTable(byProject) {
+  const body = document.getElementById('summaryBody');
+  body.innerHTML = '';
+  Object.entries(byProject).forEach(([proj, a]) => {
+    const ctrClass = a.ctr < 1 ? 'flag-warn' : (a.ctr < 2 ? '' : 'flag-ok');
+    const bounceClass = a.bouncePct > 5 ? 'flag-bad' : (a.bouncePct > 2 ? 'flag-warn' : 'flag-ok');
+    const spamClass = a.spamPct > 0.3 ? 'flag-bad' : (a.spamPct > 0.1 ? 'flag-warn' : 'flag-ok');
+    body.innerHTML += `<tr>
+      <td>${proj}</td><td>${a.campaigns}</td><td>${fmtInt(a.sent)}</td>
+      <td>${fmt(a.or)}%</td><td class="${ctrClass}">${fmt(a.ctr, 2)}%</td><td>${fmt(a.ctor)}%</td>
+      <td class="${spamClass}">${fmt(a.spamPct, 2)}%</td><td class="${bounceClass}">${fmt(a.bouncePct)}%</td>
+    </tr>`;
+  });
+}
+
+function renderChart(rows) {
+  const metric = METRICS[selectedMetric];
+  const dates = [...new Set(rows.map(c => c.date))].sort();
+  const labels = dates.map(d => d.slice(8, 10) + '.' + d.slice(5, 7));
+  const datasets = allProjects.filter(p => activeProjects.has(p)).map(proj => {
+    const data = dates.map(d => {
+      const matches = rows.filter(c => c.project === proj && c.date === d);
+      if (matches.length === 0) return null;
+      const num = matches.reduce((s, c) => s + c[metric.num], 0);
+      const den = matches.reduce((s, c) => s + c[metric.den], 0);
+      return den ? +(num / den * 100).toFixed(2) : null;
+    });
+    return { label: proj, data, borderColor: PROJECT_COLORS[proj], backgroundColor: PROJECT_COLORS[proj], spanGaps: true, tension: 0.25, pointRadius: 4 };
+  });
+  if (chart) chart.destroy();
+  chart = new Chart(document.getElementById('orChart'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { ticks: { callback: v => v + '%' } }, x: { grid: { display: false } } }
+    }
+  });
+  document.getElementById('chartLegend').innerHTML = allProjects.filter(p => activeProjects.has(p))
+    .map(p => `<span><span class="dot" style="background:${PROJECT_COLORS[p]}"></span>${p}</span>`).join('');
+}
+
+function monthKey(dateStr) { return dateStr.slice(0, 7); } // 'YYYY-MM'
+function monthLabel(key) {
+  const names = { '01':'янв', '02':'фев', '03':'мар', '04':'апр', '05':'май', '06':'июн', '07':'июл', '08':'авг', '09':'сен', '10':'окт', '11':'ноя', '12':'дек' };
+  const [y, m] = key.split('-');
+  return names[m] + ' ' + y;
+}
+
+function aggregateByMonth(rows) {
+  const out = {}; // key: 'YYYY-MM|Проект'
+  rows.forEach(c => {
+    const mk = monthKey(c.date);
+    const key = mk + '|' + c.project;
+    if (!out[key]) out[key] = { month: mk, project: c.project, campaigns: 0, sent: 0, delivered: 0, opens: 0, clicks: 0, unsubs: 0, spam: 0, bounce: 0 };
+    const a = out[key];
+    a.campaigns++; a.sent += c.sent; a.delivered += c.delivered; a.opens += c.opens;
+    a.clicks += c.clicks; a.unsubs += c.unsubs; a.spam += c.spam; a.bounce += c.bounce;
+  });
+  Object.values(out).forEach(a => {
+    a.or = a.delivered ? a.opens / a.delivered * 100 : 0;
+    a.ctr = a.delivered ? a.clicks / a.delivered * 100 : 0;
+    a.ctor = a.opens ? a.clicks / a.opens * 100 : 0;
+    a.bouncePct = a.sent ? a.bounce / a.sent * 100 : 0;
+    a.spamPct = a.delivered ? a.spam / a.delivered * 100 : 0;
+  });
+  return Object.values(out).sort((a, b) => a.month.localeCompare(b.month));
+}
+
+function renderMonthly(rows) {
+  const byMonth = aggregateByMonth(rows);
+  const months = [...new Set(byMonth.map(r => r.month))].sort();
+  const projs = allProjects.filter(p => activeProjects.has(p));
+  const fieldMap = { or: 'or', ctr: 'ctr', ctor: 'ctor', bounce: 'bouncePct', spam: 'spamPct' };
+  const field = fieldMap[selectedMonthMetric];
+
+  const datasets = projs.map(proj => ({
+    label: proj,
+    data: months.map(m => {
+      const row = byMonth.find(r => r.month === m && r.project === proj);
+      return row ? +row[field].toFixed(2) : null;
+    }),
+    backgroundColor: PROJECT_COLORS[proj]
+  }));
+
+  if (monthChart) monthChart.destroy();
+  monthChart = new Chart(document.getElementById('monthChart'), {
+    type: 'bar',
+    data: { labels: months.map(monthLabel), datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { ticks: { callback: v => v + '%' } }, x: { grid: { display: false } } }
+    }
+  });
+  document.getElementById('monthLegend').innerHTML = projs
+    .map(p => `<span><span class="dot" style="background:${PROJECT_COLORS[p]}"></span>${p}</span>`).join('');
+
+  const body = document.getElementById('monthBody');
+  body.innerHTML = '';
+  byMonth.filter(r => activeProjects.has(r.project)).forEach(r => {
+    body.innerHTML += `<tr><td>${monthLabel(r.month)}</td><td>${r.project}</td><td>${r.campaigns}</td><td>${fmtInt(r.sent)}</td><td>${fmt(r.or)}%</td><td>${fmt(r.ctr, 2)}%</td><td>${fmt(r.ctor)}%</td><td>${fmt(r.bouncePct)}%</td><td>${fmt(r.spamPct, 2)}%</td></tr>`;
+  });
+}
+
+function render() {
+  const rows = getFiltered();
+  const byProject = aggregateByProject(rows);
+  renderStats(rows, byProject);
+  renderRecommendations(byProject);
+  renderTable(byProject);
+  renderChart(rows);
+  renderMonthly(rows);
+}
+
+initUI();
+loadFromGoogleSheets();
+</script>
+</body>
+</html>
